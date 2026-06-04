@@ -4,6 +4,7 @@ from datetime import datetime
 
 from rich.console import Console
 from rich.align import Align
+from rich.layout import Layout
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.text import Text
@@ -14,18 +15,27 @@ from .storage import Storage
 
 console = Console()
 
+TIMER_PALETTES = (
+    ("cyan", "bold bright_cyan"),
+    ("green", "bold bright_green"),
+    ("yellow", "bold yellow"),
+    ("magenta", "bold bright_magenta"),
+    ("blue", "bold bright_blue"),
+    ("white", "bold white"),
+)
+
 BIG_DIGITS = {
-    "0": (" ███ ", "█   █", "█   █", "█   █", " ███ "),
-    "1": ("  █  ", " ██  ", "  █  ", "  █  ", "█████"),
-    "2": ("████ ", "    █", " ███ ", "█    ", "█████"),
-    "3": ("████ ", "    █", " ███ ", "    █", "████ "),
-    "4": ("█   █", "█   █", "█████", "    █", "    █"),
-    "5": ("█████", "█    ", "████ ", "    █", "████ "),
-    "6": (" ███ ", "█    ", "████ ", "█   █", " ███ "),
-    "7": ("█████", "    █", "   █ ", "  █  ", "  █  "),
-    "8": (" ███ ", "█   █", " ███ ", "█   █", " ███ "),
-    "9": (" ███ ", "█   █", " ████", "    █", " ███ "),
-    ":": ("     ", "  █  ", "     ", "  █  ", "     "),
+    "0": (" ██████ ", "██    ██", "██    ██", "██    ██", "██    ██", "██    ██", " ██████ "),
+    "1": ("   ██   ", " ████   ", "   ██   ", "   ██   ", "   ██   ", "   ██   ", "███████ "),
+    "2": (" ██████ ", "      ██", "      ██", " ██████ ", "██      ", "██      ", "████████"),
+    "3": ("███████ ", "      ██", "      ██", " ██████ ", "      ██", "      ██", "███████ "),
+    "4": ("██    ██", "██    ██", "██    ██", "████████", "      ██", "      ██", "      ██"),
+    "5": ("████████", "██      ", "██      ", "███████ ", "      ██", "      ██", "███████ "),
+    "6": (" ██████ ", "██      ", "██      ", "███████ ", "██    ██", "██    ██", " ██████ "),
+    "7": ("████████", "      ██", "     ██ ", "    ██  ", "   ██   ", "  ██    ", "  ██    "),
+    "8": (" ██████ ", "██    ██", "██    ██", " ██████ ", "██    ██", "██    ██", " ██████ "),
+    "9": (" ██████ ", "██    ██", "██    ██", " ███████", "      ██", "      ██", " ██████ "),
+    ":": ("        ", "   ██   ", "   ██   ", "        ", "   ██   ", "   ██   ", "        "),
 }
 
 
@@ -48,7 +58,7 @@ def format_clock(seconds: int) -> str:
 
 
 def big_clock(value: str) -> str:
-    rows = [""] * 5
+    rows = [""] * 7
     for char in value:
         glyph = BIG_DIGITS.get(char, BIG_DIGITS[":"])
         for index, line in enumerate(glyph):
@@ -56,7 +66,15 @@ def big_clock(value: str) -> str:
     return "\n".join(row.rstrip() for row in rows)
 
 
-def active_timer_panel(active: ActiveSession, *, music_label: str) -> Panel:
+def palette_style(index: int) -> str:
+    return TIMER_PALETTES[index % len(TIMER_PALETTES)][1]
+
+
+def palette_label(index: int) -> str:
+    return TIMER_PALETTES[index % len(TIMER_PALETTES)][0]
+
+
+def active_timer_panel(active: ActiveSession, *, music_label: str, digit_style: str = "bold bright_cyan") -> Panel:
     elapsed = Storage.current_active_seconds(active)
     paused = Storage.current_paused_seconds(active)
     if active.duration_seconds:
@@ -83,11 +101,37 @@ def active_timer_panel(active: ActiveSession, *, music_label: str) -> Panel:
         filled = min(24, max(0, filled))
         details.append(f"\n[{'█' * filled}{'░' * (24 - filled)}] {min(100, int((elapsed / total) * 100))}%")
 
-    controls = "Space/p pause-resume   s/q stop-save   Ctrl+C stop-save"
-    body = Text.from_markup(f"[bold cyan]{big_clock(clock)}[/bold cyan]\n")
+    body = Text(big_clock(clock) + "\n", style=digit_style)
     body.append_text(details)
-    body.append(f"\n\n{controls}", style="dim")
     return Panel(Align.center(body), title="Focus timer", border_style="cyan" if not active.is_paused else "yellow")
+
+
+def active_timer_screen(active: ActiveSession, *, music_label: str, color_index: int) -> Layout:
+    elapsed = Storage.current_active_seconds(active)
+    paused = Storage.current_paused_seconds(active)
+    state = "paused" if active.is_paused else "focus"
+    border_style = "yellow" if active.is_paused else "cyan"
+
+    header = Text()
+    header.append(" focus ", style="bold green")
+    header.append(f"{state} session", style="bold yellow" if active.is_paused else "bold green")
+    header.append(f"  task: {active.task or active.mode}")
+    header.append(f"  focused: {format_duration(elapsed)}")
+    header.append(f"  paused: {format_duration(paused)}")
+    header.append(f"  music: {music_label}")
+    header.append(f"  digits: {palette_label(color_index)}", style=palette_style(color_index))
+
+    menu = Table.grid(expand=True)
+    menu.add_column(justify="center")
+    menu.add_row("[bold]Space[/bold]/[bold]p[/bold] pause-resume   [bold]c[/bold] color   [bold]s[/bold]/[bold]q[/bold] stop-save   [bold]Ctrl+C[/bold] stop-save")
+
+    layout = Layout()
+    layout.split_column(
+        Layout(Panel(header, border_style=border_style), name="header", size=3),
+        Layout(active_timer_panel(active, music_label=music_label, digit_style=palette_style(color_index)), name="timer", ratio=1),
+        Layout(Panel(Align.center(menu), title="Menu", border_style=border_style), name="menu", size=5),
+    )
+    return layout
 
 
 def show_active(active: ActiveSession) -> None:

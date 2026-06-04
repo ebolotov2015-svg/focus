@@ -14,7 +14,7 @@ from .config import Config
 from .music import MusicLibrary, MusicPlayer
 from .stats import summarize
 from .storage import Storage
-from .ui import active_timer_panel, console, show_active, show_config, show_stats, show_stopped, show_tracks
+from .ui import TIMER_PALETTES, active_timer_screen, console, show_active, show_config, show_stats, show_stopped, show_tracks
 
 app = typer.Typer(help="Local-first focus timer with stats and optional music.")
 music_app = typer.Typer(help="Manage local music tracks.")
@@ -78,8 +78,9 @@ def raw_key_reader() -> Iterator[Callable[[], str | None]]:
 
 
 def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str) -> None:
+    color_index = 0
     with raw_key_reader() as read_key:
-        with Live(console=console, refresh_per_second=4, transient=False) as live:
+        with Live(console=console, refresh_per_second=4, transient=False, screen=True) as live:
             while True:
                 current = storage.active_session()
                 if current is None:
@@ -87,13 +88,13 @@ def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str) 
                     console.print("[yellow]Session ended from another command.[/yellow]")
                     return
 
-                live.update(active_timer_panel(current, music_label=music_label))
+                live.update(active_timer_screen(current, music_label=music_label, color_index=color_index))
                 key = read_key()
                 if key == "\x03":
                     raise KeyboardInterrupt
                 if key in {"s", "q"}:
                     record = storage.stop_session()
-                    live.update(active_timer_panel(current, music_label=music_label))
+                    live.update(active_timer_screen(current, music_label=music_label, color_index=color_index))
                     live.stop()
                     show_stopped(record)
                     return
@@ -104,11 +105,14 @@ def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str) 
                     else:
                         current = storage.pause_session()
                         player.pause()
-                    live.update(active_timer_panel(current, music_label=music_label))
+                    live.update(active_timer_screen(current, music_label=music_label, color_index=color_index))
                 elif key == "r" and current.is_paused:
                     current = storage.resume_session()
                     player.resume()
-                    live.update(active_timer_panel(current, music_label=music_label))
+                    live.update(active_timer_screen(current, music_label=music_label, color_index=color_index))
+                elif key == "c":
+                    color_index = (color_index + 1) % len(TIMER_PALETTES)
+                    live.update(active_timer_screen(current, music_label=music_label, color_index=color_index))
 
                 current = storage.active_session()
                 if current and current.duration_seconds and Storage.current_active_seconds(current) >= current.duration_seconds:
