@@ -4,6 +4,7 @@ from datetime import datetime
 
 from rich.console import Console
 from rich.align import Align
+from rich.console import Group
 from rich.layout import Layout
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
@@ -25,17 +26,17 @@ TIMER_PALETTES = (
 )
 
 BIG_DIGITS = {
-    "0": (" ██████ ", "██    ██", "██    ██", "██    ██", "██    ██", "██    ██", " ██████ "),
-    "1": ("   ██   ", " ████   ", "   ██   ", "   ██   ", "   ██   ", "   ██   ", "███████ "),
-    "2": (" ██████ ", "      ██", "      ██", " ██████ ", "██      ", "██      ", "████████"),
-    "3": ("███████ ", "      ██", "      ██", " ██████ ", "      ██", "      ██", "███████ "),
-    "4": ("██    ██", "██    ██", "██    ██", "████████", "      ██", "      ██", "      ██"),
-    "5": ("████████", "██      ", "██      ", "███████ ", "      ██", "      ██", "███████ "),
-    "6": (" ██████ ", "██      ", "██      ", "███████ ", "██    ██", "██    ██", " ██████ "),
-    "7": ("████████", "      ██", "     ██ ", "    ██  ", "   ██   ", "  ██    ", "  ██    "),
-    "8": (" ██████ ", "██    ██", "██    ██", " ██████ ", "██    ██", "██    ██", " ██████ "),
-    "9": (" ██████ ", "██    ██", "██    ██", " ███████", "      ██", "      ██", " ██████ "),
-    ":": ("        ", "   ██   ", "   ██   ", "        ", "   ██   ", "   ██   ", "        "),
+    "0": ("██████", "██  ██", "██  ██", "██  ██", "██████"),
+    "1": ("  ██  ", "████  ", "  ██  ", "  ██  ", "██████"),
+    "2": ("██████", "    ██", "██████", "██    ", "██████"),
+    "3": ("██████", "    ██", "██████", "    ██", "██████"),
+    "4": ("██  ██", "██  ██", "██████", "    ██", "    ██"),
+    "5": ("██████", "██    ", "██████", "    ██", "██████"),
+    "6": ("██████", "██    ", "██████", "██  ██", "██████"),
+    "7": ("██████", "    ██", "   ██ ", "  ██  ", "  ██  "),
+    "8": ("██████", "██  ██", "██████", "██  ██", "██████"),
+    "9": ("██████", "██  ██", "██████", "    ██", "██████"),
+    ":": ("      ", "  ██  ", "      ", "  ██  ", "      "),
 }
 
 
@@ -58,11 +59,11 @@ def format_clock(seconds: int) -> str:
 
 
 def big_clock(value: str) -> str:
-    rows = [""] * 7
+    rows = [""] * 5
     for char in value:
         glyph = BIG_DIGITS.get(char, BIG_DIGITS[":"])
         for index, line in enumerate(glyph):
-            rows[index] += line + " "
+            rows[index] += line + "  "
     return "\n".join(row.rstrip() for row in rows)
 
 
@@ -74,7 +75,7 @@ def palette_label(index: int) -> str:
     return TIMER_PALETTES[index % len(TIMER_PALETTES)][0]
 
 
-def active_timer_panel(active: ActiveSession, *, music_label: str, digit_style: str = "bold bright_cyan") -> Panel:
+def active_timer_body(active: ActiveSession, *, music_label: str, digit_style: str = "bold bright_cyan") -> Group:
     elapsed = Storage.current_active_seconds(active)
     paused = Storage.current_paused_seconds(active)
     if active.duration_seconds:
@@ -101,19 +102,19 @@ def active_timer_panel(active: ActiveSession, *, music_label: str, digit_style: 
         filled = min(24, max(0, filled))
         details.append(f"\n[{'█' * filled}{'░' * (24 - filled)}] {min(100, int((elapsed / total) * 100))}%")
 
-    body = Text(big_clock(clock) + "\n", style=digit_style)
-    body.append_text(details)
-    return Panel(Align.center(body), title="Focus timer", border_style="cyan" if not active.is_paused else "yellow")
+    clock_text = Text(big_clock(clock), style=digit_style)
+    details_text = Align.center(details)
+    return Group(Align.center(clock_text), "", details_text)
 
 
 def active_timer_screen(active: ActiveSession, *, music_label: str, color_index: int) -> Layout:
     elapsed = Storage.current_active_seconds(active)
     paused = Storage.current_paused_seconds(active)
-    state = "paused" if active.is_paused else "focus"
+    state = "paused" if active.is_paused else "running"
     border_style = "yellow" if active.is_paused else "cyan"
 
     header = Text()
-    header.append(" focus ", style="bold green")
+    header.append("focus ", style="bold green")
     header.append(f"{state} session", style="bold yellow" if active.is_paused else "bold green")
     header.append(f"  task: {active.task or active.mode}")
     header.append(f"  focused: {format_duration(elapsed)}")
@@ -127,9 +128,17 @@ def active_timer_screen(active: ActiveSession, *, music_label: str, color_index:
 
     layout = Layout()
     layout.split_column(
-        Layout(Panel(header, border_style=border_style), name="header", size=3),
-        Layout(active_timer_panel(active, music_label=music_label, digit_style=palette_style(color_index)), name="timer", ratio=1),
-        Layout(Panel(Align.center(menu), title="Menu", border_style=border_style), name="menu", size=5),
+        Layout(Align(header, align="center", vertical="middle"), name="header", size=3),
+        Layout(
+            Align(
+                active_timer_body(active, music_label=music_label, digit_style=palette_style(color_index)),
+                align="center",
+                vertical="middle",
+            ),
+            name="timer",
+            ratio=1,
+        ),
+        Layout(Panel(Align.center(menu), title="Menu", border_style=border_style), name="menu", size=3),
     )
     return layout
 
