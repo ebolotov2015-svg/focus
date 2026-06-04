@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import contextlib
+import os
+import sys
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Callable, Iterator
 
 import typer
+from rich.live import Live
 
 from .config import Config
 from .music import MusicLibrary, MusicPlayer
 from .stats import summarize
 from .storage import Storage
-from .ui import console, format_duration, show_active, show_config, show_stats, show_stopped, show_tracks
+from .ui import active_timer_panel, console, show_active, show_config, show_stats, show_stopped, show_tracks
 
 app = typer.Typer(help="Local-first focus timer with stats and optional music.")
 music_app = typer.Typer(help="Manage local music tracks.")
@@ -32,6 +36,87 @@ def minutes_to_seconds(value: int | None) -> int | None:
     if value <= 0:
         raise typer.BadParameter("Duration must be greater than zero.")
     return value * 60
+
+
+@contextlib.contextmanager
+def raw_key_reader() -> Iterator[Callable[[], str | None]]:
+    if not sys.stdin.isatty():
+        yield lambda: None
+        return
+
+    if os.name == "nt":
+        import msvcrt
+
+        def read_windows_key() -> str | None:
+            if not msvcrt.kbhit():
+                return None
+            key = msvcrt.getwch()
+            return "\x03" if key == "\x03" else key.lower()
+
+        yield read_windows_key
+        return
+
+    import select
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+
+        def read_posix_key() -> str | None:
+            ready, _, _ = select.select([sys.stdin], [], [], 0)
+            if not ready:
+                return None
+            key = sys.stdin.read(1)
+            return "\x03" if key == "\x03" else key.lower()
+
+        yield read_posix_key
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str) -> None:
+    with raw_key_reader() as read_key:
+        with Live(console=console, refresh_per_second=4, transient=False) as live:
+            while True:
+                current = storage.active_session()
+                if current is None:
+                    live.stop()
+                    console.print("[yellow]Session ended from another command.[/yellow]")
+                    return
+
+                live.update(active_timer_panel(current, music_label=music_label))
+                key = read_key()
+                if key == "\x03":
+                    raise KeyboardInterrupt
+                if key in {"s", "q"}:
+                    record = storage.stop_session()
+                    live.update(active_timer_panel(current, music_label=music_label))
+                    live.stop()
+                    show_stopped(record)
+                    return
+                if key in {" ", "p"}:
+                    if current.is_paused:
+                        current = storage.resume_session()
+                        player.resume()
+                    else:
+                        current = storage.pause_session()
+                        player.pause()
+                    live.update(active_timer_panel(current, music_label=music_label))
+                elif key == "r" and current.is_paused:
+                    current = storage.resume_session()
+                    player.resume()
+                    live.update(active_timer_panel(current, music_label=music_label))
+
+                current = storage.active_session()
+                if current and current.duration_seconds and Storage.current_active_seconds(current) >= current.duration_seconds:
+                    record = storage.stop_session()
+                    live.stop()
+                    show_stopped(record)
+                    return
+                time.sleep(0.25)
 
 
 @app.command()
@@ -64,21 +149,10 @@ def start(
     player = MusicPlayer()
     if music_path:
         player.play_loop(music_path)
-    console.print(f"[green]Starting focus session[/green]: {task or mode}")
-    console.print(f"Music: {selected_track if music_path else 'off'}")
-    console.print("Press Ctrl+C to stop.")
+    music_label = selected_track if music_path else "off"
 
     try:
-        while True:
-            current = storage.active_session()
-            if current is None:
-                console.print("[yellow]Session ended from another command.[/yellow]")
-                return
-            if current.duration_seconds and Storage.current_active_seconds(current) >= current.duration_seconds:
-                record = storage.stop_session()
-                show_stopped(record)
-                return
-            time.sleep(1)
+        run_focus_timer(storage, player, music_label=music_label)
     except KeyboardInterrupt:
         record = storage.stop_session()
         show_stopped(record)

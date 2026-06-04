@@ -54,8 +54,12 @@ class MusicPlayer:
     def __init__(self) -> None:
         self._pygame = None
         self._process: subprocess.Popen[bytes] | None = None
+        self._path: Path | None = None
+        self._paused = False
 
     def play_loop(self, path: Path) -> None:
+        self._path = path
+        self._paused = False
         try:
             import pygame
         except ImportError:
@@ -65,6 +69,30 @@ class MusicPlayer:
         pygame.mixer.music.load(str(path))
         pygame.mixer.music.play(loops=-1)
         self._pygame = pygame
+
+    def pause(self) -> None:
+        if self._pygame is not None:
+            self._pygame.mixer.music.pause()
+            self._paused = True
+            return
+        if self._process is not None:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+            self._process = None
+            self._paused = True
+
+    def resume(self) -> None:
+        if not self._paused or self._path is None:
+            return
+        if self._pygame is not None:
+            self._pygame.mixer.music.unpause()
+            self._paused = False
+            return
+        self._play_with_system_player(self._path)
+        self._paused = False
 
     def stop(self) -> None:
         if self._pygame is not None:
@@ -78,6 +106,7 @@ class MusicPlayer:
             except subprocess.TimeoutExpired:
                 self._process.kill()
             self._process = None
+        self._paused = False
 
     def _play_with_system_player(self, path: Path) -> None:
         candidates = [

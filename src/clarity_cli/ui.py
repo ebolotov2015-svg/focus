@@ -3,14 +3,30 @@ from __future__ import annotations
 from datetime import datetime
 
 from rich.console import Console
+from rich.align import Align
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
+from rich.text import Text
 from rich.table import Table
 
 from .models import ActiveSession, SessionRecord, StatsSummary
 from .storage import Storage
 
 console = Console()
+
+BIG_DIGITS = {
+    "0": (" ███ ", "█   █", "█   █", "█   █", " ███ "),
+    "1": ("  █  ", " ██  ", "  █  ", "  █  ", "█████"),
+    "2": ("████ ", "    █", " ███ ", "█    ", "█████"),
+    "3": ("████ ", "    █", " ███ ", "    █", "████ "),
+    "4": ("█   █", "█   █", "█████", "    █", "    █"),
+    "5": ("█████", "█    ", "████ ", "    █", "████ "),
+    "6": (" ███ ", "█    ", "████ ", "█   █", " ███ "),
+    "7": ("█████", "    █", "   █ ", "  █  ", "  █  "),
+    "8": (" ███ ", "█   █", " ███ ", "█   █", " ███ "),
+    "9": (" ███ ", "█   █", " ████", "    █", " ███ "),
+    ":": ("     ", "  █  ", "     ", "  █  ", "     "),
+}
 
 
 def format_duration(seconds: int) -> str:
@@ -21,6 +37,57 @@ def format_duration(seconds: int) -> str:
     if minutes:
         return f"{minutes}m {sec}s"
     return f"{sec}s"
+
+
+def format_clock(seconds: int) -> str:
+    minutes, sec = divmod(max(0, seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{sec:02d}"
+    return f"{minutes:02d}:{sec:02d}"
+
+
+def big_clock(value: str) -> str:
+    rows = [""] * 5
+    for char in value:
+        glyph = BIG_DIGITS.get(char, BIG_DIGITS[":"])
+        for index, line in enumerate(glyph):
+            rows[index] += line + " "
+    return "\n".join(row.rstrip() for row in rows)
+
+
+def active_timer_panel(active: ActiveSession, *, music_label: str) -> Panel:
+    elapsed = Storage.current_active_seconds(active)
+    paused = Storage.current_paused_seconds(active)
+    if active.duration_seconds:
+        remaining = max(0, active.duration_seconds - elapsed)
+        clock = format_clock(remaining)
+        timer_label = "remaining"
+    else:
+        clock = format_clock(elapsed)
+        timer_label = "elapsed"
+
+    state = "PAUSED" if active.is_paused else "FOCUS"
+    state_style = "bold yellow" if active.is_paused else "bold green"
+    details = Text()
+    details.append(f"{state}", style=state_style)
+    details.append(f"  {timer_label}")
+    details.append(f"  task: {active.task or active.mode}")
+    details.append(f"  focused: {format_duration(elapsed)}")
+    details.append(f"  paused: {format_duration(paused)}")
+    details.append(f"  music: {music_label}")
+
+    if active.duration_seconds:
+        total = active.duration_seconds
+        filled = int((elapsed / total) * 24) if total else 0
+        filled = min(24, max(0, filled))
+        details.append(f"\n[{'█' * filled}{'░' * (24 - filled)}] {min(100, int((elapsed / total) * 100))}%")
+
+    controls = "Space/p pause-resume   s/q stop-save   Ctrl+C stop-save"
+    body = Text.from_markup(f"[bold cyan]{big_clock(clock)}[/bold cyan]\n")
+    body.append_text(details)
+    body.append(f"\n\n{controls}", style="dim")
+    return Panel(Align.center(body), title="Focus timer", border_style="cyan" if not active.is_paused else "yellow")
 
 
 def show_active(active: ActiveSession) -> None:
