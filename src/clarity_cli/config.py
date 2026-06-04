@@ -4,11 +4,13 @@ from pathlib import Path
 
 from .paths import default_music_dir
 from .storage import Storage
+from .ui import TIMER_COLOR_NAMES
 
 DEFAULTS = {
     "daily_goal": "120",
     "default_music": "false",
     "default_track": "",
+    "timer_color": "cyan",
     "time_format": "24h",
     "notifications": "false",
     "music_dir": str(default_music_dir()),
@@ -34,6 +36,11 @@ class Config:
                 raise ValueError("daily_goal must be greater than zero.")
         if key in {"default_music", "notifications"} and value.lower() not in {"true", "false"}:
             raise ValueError(f"{key} must be true or false.")
+        if key == "timer_color":
+            value = value.lower()
+            if value not in TIMER_COLOR_NAMES:
+                colors = ", ".join(TIMER_COLOR_NAMES)
+                raise ValueError(f"timer_color must be one of: {colors}.")
         if key == "music_dir":
             Path(value).expanduser().mkdir(parents=True, exist_ok=True)
             value = str(Path(value).expanduser())

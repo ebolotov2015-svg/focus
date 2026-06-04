@@ -14,7 +14,17 @@ from .config import Config
 from .music import MusicLibrary, MusicPlayer
 from .stats import summarize
 from .storage import Storage
-from .ui import TIMER_PALETTES, active_timer_screen, console, show_active, show_config, show_stats, show_stopped, show_tracks
+from .ui import (
+    TIMER_PALETTES,
+    active_timer_screen,
+    console,
+    palette_index,
+    show_active,
+    show_config,
+    show_stats,
+    show_stopped,
+    show_tracks,
+)
 
 app = typer.Typer(help="Local-first focus timer with stats and optional music.")
 music_app = typer.Typer(help="Manage local music tracks.")
@@ -77,8 +87,7 @@ def raw_key_reader() -> Iterator[Callable[[], str | None]]:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
-def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str) -> None:
-    color_index = 0
+def run_focus_timer(storage: Storage, player: MusicPlayer, *, music_label: str, color_index: int = 0) -> None:
     with raw_key_reader() as read_key:
         with Live(console=console, refresh_per_second=4, transient=False, screen=True) as live:
             while True:
@@ -156,7 +165,7 @@ def start(
     music_label = selected_track if music_path else "off"
 
     try:
-        run_focus_timer(storage, player, music_label=music_label)
+        run_focus_timer(storage, player, music_label=music_label, color_index=palette_index(config.get("timer_color")))
     except KeyboardInterrupt:
         record = storage.stop_session()
         show_stopped(record)

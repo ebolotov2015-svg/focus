@@ -24,6 +24,7 @@ TIMER_PALETTES = (
     ("blue", "bold bright_blue"),
     ("white", "bold white"),
 )
+TIMER_COLOR_NAMES = tuple(label for label, _ in TIMER_PALETTES)
 
 BIG_DIGITS = {
     "0": ("██████", "██  ██", "██  ██", "██  ██", "██████"),
@@ -73,6 +74,14 @@ def palette_style(index: int) -> str:
 
 def palette_label(index: int) -> str:
     return TIMER_PALETTES[index % len(TIMER_PALETTES)][0]
+
+
+def palette_index(label: str) -> int:
+    normalized = label.lower()
+    for index, (name, _) in enumerate(TIMER_PALETTES):
+        if name == normalized:
+            return index
+    return 0
 
 
 def active_timer_body(active: ActiveSession, *, music_label: str, digit_style: str = "bold bright_cyan") -> Group:

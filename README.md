@@ -151,6 +151,7 @@ focus config
 focus config set daily_goal 120
 focus config set default_music true
 focus config set default_track rain.ogg
+focus config set timer_color green
 focus where
 ```
 
@@ -251,6 +252,12 @@ focus config set daily_goal 120
 focus config set default_music true
 ```
 
+Изменить цвет таймера по умолчанию:
+
+```bash
+focus config set timer_color green
+```
+
 Изменить папку для добавленных треков:
 
 ```bash
@@ -262,6 +269,7 @@ focus config set music_dir ~/Music/focus
 - `daily_goal` — дневная цель в минутах;
 - `default_music` — включать музыку по умолчанию, `true` или `false`;
 - `default_track` — имя трека из `focus music list`;
+- `timer_color` — цвет цифр таймера по умолчанию: `cyan`, `green`, `yellow`, `magenta`, `blue` или `white`;
 - `time_format` — формат времени;
 - `notifications` — настройка уведомлений;
 - `music_dir` — папка, куда копируются добавленные треки.
