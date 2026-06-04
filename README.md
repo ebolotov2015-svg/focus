@@ -1,76 +1,96 @@
 # clarity-cli
 
-`clarity-cli` is a local-first command-line focus timer for focused work sessions, optional background music, and simple productivity statistics.
+`clarity-cli` — локальный CLI-инструмент для фокус-сессий, фоновой музыки и простой статистики продуктивности.
 
-It is designed as an independent open-source tool. It works offline, stores data locally, and does not include any music files.
+Проект работает офлайн, хранит данные локально и не поставляет музыку в репозитории.
 
-## Features
+## Возможности
 
-- Start, pause, resume, stop, and inspect focus sessions.
-- Track active time without counting pauses.
-- Save session history in SQLite.
-- Show daily, weekly, and monthly stats with Rich tables and progress bars.
-- Add and manage local `.mp3`, `.wav`, and `.ogg` tracks.
-- Store configuration in the user's app config/data directories.
+- запуск фокус-сессии из терминала;
+- пауза, продолжение, остановка и просмотр статуса;
+- учет активного времени без пауз;
+- сохранение истории сессий в SQLite;
+- статистика за день, неделю и месяц;
+- красивый вывод через Rich: таблицы, панели, прогресс;
+- добавление локальных `.mp3`, `.wav`, `.ogg` треков;
+- локальная конфигурация через `platformdirs`.
 
-## Installation
+## Быстрый запуск
 
-Requires Python 3.11 or newer.
+Нужен Python 3.11 или новее.
+
+Если проект уже скачан:
 
 ```bash
+cd clarity-cli
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-```
-
-After installation, the `focus` command is available.
-
-```bash
 focus --help
 ```
 
-## Quick Start
-
-Start a focus session:
+Если запускаешь из GitHub-клона:
 
 ```bash
-focus start --task "Write README"
+git clone <URL_ТВОЕГО_РЕПОЗИТОРИЯ>
+cd <ИМЯ_ПАПКИ_РЕПОЗИТОРИЯ>
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+focus --help
 ```
 
-Start a 50-minute session:
+На Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+focus --help
+```
+
+## Первый запуск
+
+Запустить сессию:
 
 ```bash
-focus start --duration 50 --task "Deep work"
+focus start --task "Написать README"
 ```
 
-Check status from another terminal:
+Запустить сессию на 50 минут:
+
+```bash
+focus start --duration 50 --task "Глубокая работа"
+```
+
+Посмотреть статус из другого терминала:
 
 ```bash
 focus status
 ```
 
-Pause and resume:
+Поставить на паузу и продолжить:
 
 ```bash
 focus pause
 focus resume
 ```
 
-Stop and save the session:
+Остановить и сохранить сессию:
 
 ```bash
 focus stop
 ```
 
-`focus start` also stops and saves the session when you press `Ctrl+C`.
+Если сессия запущена через `focus start`, ее также можно остановить через `Ctrl+C`. Результат будет сохранен.
 
-## Commands
+## Команды
 
 ```bash
 focus start
 focus start --music
 focus start --duration 50
-focus start --task "Write documentation"
+focus start --task "Написать документацию"
 focus pause
 focus resume
 focus stop
@@ -89,82 +109,137 @@ focus config set default_music true
 focus where
 ```
 
-## Music
+## Статистика
 
-Music is optional. No audio files are shipped with this repository because music rights vary by file and source.
+Показать статистику за сегодня:
 
-Add your own local track:
+```bash
+focus stats --today
+```
+
+За неделю:
+
+```bash
+focus stats --week
+```
+
+За месяц:
+
+```bash
+focus stats --month
+```
+
+В статистике отображаются:
+
+- сфокусированные минуты;
+- количество сессий;
+- средняя длительность сессии;
+- дневная цель;
+- прогресс к дневной цели.
+
+## Музыка
+
+Музыка необязательна. В репозитории нет аудиофайлов, потому что права на музыку зависят от конкретного файла и источника.
+
+Добавить свой трек:
 
 ```bash
 focus music add ~/Music/rain.ogg
 ```
 
-List tracks:
+Показать список треков:
 
 ```bash
 focus music list
 ```
 
-Play a track:
+Проиграть трек:
 
 ```bash
 focus music play rain.ogg
 ```
 
-Start a session with the default track:
+Сделать трек треком по умолчанию:
 
 ```bash
 focus config set default_track rain.ogg
 focus config set default_music true
+```
+
+Запустить сессию с музыкой:
+
+```bash
 focus start --music
 ```
 
-Supported file extensions are `.mp3`, `.wav`, and `.ogg`. Playback uses `pygame` when available, otherwise it tries common system players such as `mpv`, `ffplay`, `afplay`, or `paplay`.
+Поддерживаются расширения `.mp3`, `.wav`, `.ogg`.
 
-To install the optional Python audio backend:
+Для воспроизведения используется `pygame`, если он установлен. Если `pygame` нет, приложение попробует системные плееры: `mpv`, `ffplay`, `afplay` или `paplay`.
+
+Опционально можно установить Python-аудиобэкенд:
 
 ```bash
 pip install -e ".[audio]"
 ```
 
-## Configuration
+## Конфигурация
 
-Show config:
+Показать текущую конфигурацию:
 
 ```bash
 focus config
 ```
 
-Available keys:
+Доступные настройки:
 
-- `daily_goal`: daily focus target in minutes.
-- `default_music`: `true` or `false`.
-- `default_track`: track name from `focus music list`.
-- `time_format`: currently stored for user preference.
-- `notifications`: currently stored for user preference.
-- `music_dir`: directory where added tracks are copied.
+- `daily_goal`: дневная цель в минутах;
+- `default_music`: включать музыку по умолчанию, `true` или `false`;
+- `default_track`: имя трека из `focus music list`;
+- `time_format`: пользовательская настройка формата времени;
+- `notifications`: пользовательская настройка уведомлений;
+- `music_dir`: папка, куда копируются добавленные треки.
 
-## Data Storage
+Примеры:
 
-`clarity-cli` uses `platformdirs` to keep user data out of the repository.
+```bash
+focus config set daily_goal 120
+focus config set default_music false
+focus config set music_dir ~/Music/clarity-cli
+```
 
-Show exact local paths:
+## Где хранятся данные
+
+`clarity-cli` использует `platformdirs`, поэтому данные не сохраняются в случайных файлах внутри репозитория.
+
+Показать точные пути:
 
 ```bash
 focus where
 ```
 
-The SQLite database is stored in the user data directory. Music files are copied into the configured music directory.
+Обычно там будут:
 
-## Development
+- SQLite-база со статистикой;
+- папка с добавленными музыкальными файлами;
+- локальная конфигурация.
 
-Run tests:
+## Разработка
+
+Установить зависимости для разработки:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Запустить тесты:
 
 ```bash
 pytest
 ```
 
-Project layout:
+Структура проекта:
 
 ```text
 .
@@ -174,6 +249,7 @@ Project layout:
 │   └── clarity_cli/
 │       ├── cli.py
 │       ├── config.py
+│       ├── main.py
 │       ├── models.py
 │       ├── music.py
 │       ├── paths.py
@@ -183,10 +259,32 @@ Project layout:
 └── tests/
 ```
 
-## Contributing
+## Частые проблемы
 
-Small, focused pull requests are preferred. Keep the tool local-first, avoid network requirements, and do not commit copyrighted music.
+Если команда `focus` не найдена, проверь, что виртуальное окружение активировано:
 
-## License
+```bash
+source .venv/bin/activate
+```
+
+Если музыка не играет, установи один из системных плееров:
+
+```bash
+sudo pacman -S mpv
+```
+
+или установи опциональный аудиобэкенд:
+
+```bash
+pip install -e ".[audio]"
+```
+
+Если используешь Linux-дистрибутив с защищенным системным Python, не ставь пакет глобально. Используй `.venv`, как показано выше.
+
+## Вклад в проект
+
+Приветствуются небольшие и понятные pull request'ы. Проект должен оставаться локальным, работать без интернета и не содержать copyrighted музыку.
+
+## Лицензия
 
 MIT
